@@ -1,9 +1,13 @@
 from itertools import count
-
+import os
+import datetime
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import numpy as np
 import torch
+from io import StringIO
+import sys
+from contextlib import redirect_stdout
 
 from Grid_Cells import GC_Population
 from STDP_Q_Learning import STDP_Q_Learning
@@ -76,6 +80,161 @@ def generate_weights(in_size, out_size, sparsity, range):
   w *= wmax
   w = w.reshape(in_size, out_size)
   return w
+
+
+def generate_analysis_report(model, training_history, num_episodes, learning_rate):
+  """
+  Generate a comprehensive HTML report about the neural network training and synaptic weight analysis.
+  
+  Args:
+      model: The trained STDP_Q_Learning model
+      training_history: History of training data across episodes
+      num_episodes: Number of training episodes completed
+      learning_rate: Learning rate used during training
+      
+  Returns:
+      str: Path to the generated report file
+  """
+  # Create a directory for the report if it doesn't exist
+  report_dir = os.path.join(os.getcwd(), 'weight_analysis_reports')
+  os.makedirs(report_dir, exist_ok=True)
+  
+  # Generate a timestamp for the report
+  timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+  report_path = os.path.join(os.getcwd(), 'weight_analysis_reports', f'weight_analysis_report_{timestamp}.html')
+  
+  # Ensure directory exists
+  os.makedirs(os.path.dirname(report_path), exist_ok=True)
+  
+  # Create animation of weight evolution
+  animation_path = os.path.join(os.getcwd(), 'weight_analysis_reports', f'weight_evolution_{timestamp}.gif')
+  model.create_weight_animation(animation_path, fps=5, episodes_per_step=[num_episodes for _ in range(len(model.weight_history))])
+  
+  # Visualize weight fluctuations and save the visualizations
+  analysis_dir = os.path.join(os.getcwd(), 'weight_analysis_reports')
+  fluctuating_indices, saved_vis_files = model.visualize_weight_fluctuations(save_dir=analysis_dir)
+  
+  # Create detailed HTML report
+  with open(report_path, 'w') as f:
+    f.write(f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Synaptic Weight Analysis Report</title>
+  <style>
+    body {{ font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; max-width: 1200px; margin: 0 auto; padding: 20px; color: #333; }}
+    h1 {{ color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }}
+    h2 {{ color: #3498db; margin-top: 30px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }}
+    h3 {{ color: #2980b9; }}
+    img {{ max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 5px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }}
+    table {{ border-collapse: collapse; width: 100%; margin: 20px 0; }}
+    th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+    th {{ background-color: #f2f2f2; }}
+    tr:nth-child(even) {{ background-color: #f9f9f9; }}
+    .code {{ background-color: #f8f8f8; border: 1px solid #ddd; border-radius: 3px; padding: 10px; font-family: monospace; white-space: pre-wrap; }}
+    .container {{ display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; margin: 20px 0; }}
+    .image-container {{ margin-bottom: 20px; }}
+    .card {{ background-color: white; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); padding: 15px; margin-bottom: 20px; }}
+    .section {{ margin-bottom: 40px; }}
+    .highlight {{ background-color: #fffde7; padding: 15px; border-left: 4px solid #ffd54f; margin: 20px 0; }}
+    .animation-container {{ text-align: center; margin: 30px 0; }}
+  </style>
+</head>
+<body>
+  <h1>Synaptic Weight Analysis Report</h1>
+  
+  <div class="section card">
+    <h2>Training Summary</h2>
+    <ul>
+      <li><strong>Date:</strong> {timestamp}</li>
+      <li><strong>Episodes:</strong> {num_episodes}</li>
+      <li><strong>Total Steps:</strong> {len(model.weight_history)}</li>
+      <li><strong>Learning Rate:</strong> {learning_rate}</li>
+      <li><strong>Network Structure:</strong> {model.weights.value.shape[0]} input → {model.weights.value.shape[1]} output</li>
+    </ul>
+  </div>
+  
+  <div class="section">
+    <h2>Weight Fluctuation Analysis</h2>
+    
+    <div class="card">
+      <h3>Weight Overview</h3>
+      <p>Overview of the most fluctuating synaptic weights throughout training:</p>
+      <div class="image-container">
+        <img src="{os.path.basename(saved_vis_files.get('overview', ''))}" alt="Weight Overview">
+      </div>
+    </div>
+    
+    <div class="card">
+      <h3>Detailed Weight Analysis</h3>
+      <p>Detailed view of the top most fluctuating individual weights:</p>
+      <div class="image-container">
+        <img src="{os.path.basename(saved_vis_files.get('detail', ''))}" alt="Weight Detail View">
+      </div>
+    </div>
+    
+    <div class="card">
+      <h3>Variance Heatmap</h3>
+      <p>Spatial distribution of weight variances, with high variance weights highlighted:</p>
+      <div class="image-container">
+        <img src="{os.path.basename(saved_vis_files.get('heatmap', ''))}" alt="Variance Heatmap">
+      </div>
+    </div>
+    
+    <div class="card">
+      <h3>Variance Distribution</h3>
+      <p>Statistical distribution of weight variances relative to the threshold:</p>
+      <div class="image-container">
+        <img src="{os.path.basename(saved_vis_files.get('distribution', ''))}" alt="Variance Distribution">
+      </div>
+    </div>
+  </div>
+  
+  <div class="section card">
+    <h3>Identified Fluctuating Synapses</h3>
+    <p>The following synapses were identified as having variance above the threshold:</p>
+    <div class="code highlight">""")
+    # Capture the output of identify_fluctuating_synapses
+    captured_output = StringIO()
+    with redirect_stdout(captured_output):
+      fluctuating_synapses, variances = model.identify_fluctuating_synapses()
+    
+    # Write the captured output and analysis to the report
+    if captured_output.getvalue().strip():
+      f.write(f"""
+      {captured_output.getvalue().replace("\n", "<br>")}
+    </div>
+  </div>
+""")
+    
+    # Add summary statistics
+    f.write(f"""  
+  <div class="section card">
+    <h2>Summary Statistics</h2>
+    <ul>
+""")
+    
+    if len(fluctuating_synapses) > 0:
+      f.write(f"      <li>These fluctuating synapses represent {len(fluctuating_synapses) / (model.weights.value.shape[0] * model.weights.value.shape[1]) * 100:.2f}% of all synapses.</li>\n")
+      f.write(f"      <li>The highest variance observed was {variances.max():.6f}.</li>\n")
+    
+    f.write(f"      <li>The weight matrix visualization shows the connection strength between {model.weights.value.shape[0]} input neurons and {model.weights.value.shape[1]} output neurons.</li>\n")
+    f.write("    </ul>\n  </div>\n")
+    
+    # Add animation
+    f.write(f"""  
+  <div class="section card animation-container">
+    <h3>Weight Evolution Animation</h3>
+    <p>The animation below shows how the weights evolved during training:</p>
+    <img src="weight_evolution_{timestamp}.gif" alt="Weight Evolution Animation">
+  </div>
+</body>
+</html>
+""")
+  
+  print(f"\nDetailed analysis report saved to: {report_path}")
+  return report_path
 
 
 def run(parameters: dict):
@@ -212,6 +371,8 @@ def run(parameters: dict):
     decay=DECAY,
     lr=LR,
     hyper_params=HYPERPARAMS,
+    max_history_length=100,  # Store last 100 weight states
+    fluctuation_threshold=0.1,  # Threshold for identifying fluctuating synapses
   )
 
   env = Grid_Cell_Maze_Environment(
@@ -264,6 +425,8 @@ def run(parameters: dict):
     print(f"Episode {episode+1}/{NUM_EPISODES} - Steps: {len(history)}")
     universal_history.append(history)
 
+  generate_analysis_report(model, universal_history, NUM_EPISODES, LR)
+
 
 if __name__ == '__main__':
   # primes = np.array([3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53,])
@@ -302,8 +465,8 @@ if __name__ == '__main__':
   primes = np.array([3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53,])
   np.random.seed(1)
   p = {
-    'plot': True,
-    'animate_training': True,
+    'plot': False,
+    'animate_training': False,
     'maze_size': (5, 5),
     'num_modules': 2,
     'offsets_per_module': 3,
@@ -361,7 +524,7 @@ if __name__ == '__main__':
     'lr': 0.1,      # Weight update learning rateq
     'trace_length': 15,
     'env_path': r'/Users/moshetannenbaum/bindset 4/bindsnet/scripts/Chris/DQN/env.pkl',
-    'max_steps': 1000,
-    'episodes': 100,
+    'max_steps': 40,
+    'episodes': 2,
   }
   run(p)
