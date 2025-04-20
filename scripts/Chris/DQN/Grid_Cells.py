@@ -180,6 +180,7 @@ class GC_Module:
     self.scales = scales
     self.sharpnesses = sharpnesses
     self.max_firing_rates = max_firing_rates
+    self.colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k'] * (n_cells // 7 + 1)  # This will ensure enough colors
     if colors is None:
       self.colors = []
       for cmap_name in ['tab20', 'tab20b', 'tab20c', 'Set1', 'Set2', 'Set3', 'Paired', 'Pastel1', 'Pastel2',

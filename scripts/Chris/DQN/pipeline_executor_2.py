@@ -193,7 +193,11 @@ def run(parameters: dict):
 
 
   ## Perform Q-Learning ##
+  # TODO: Create a genrate  weights function that connects each resivoir neuron to only one output mortor nueron, and to make sure that there is an equel distrubutions of those conections 
+  # So like if there are 100 resivoir neurons and 4 output motor neurons, then each output motor neuron should have 25 connections to the resivoir neurons
   w_exc_out = generate_weights(EXC_SIZE+INH_SIZE, 4, SPARSITIES['exc_out'], RANGES['exc_out'])
+
+  # This can be kept the same its to craete compettive synapyses between the output motor neurons - not touching this for now
   w_out_out = generate_weights(4, 4, SPARSITIES['out_out'], RANGES['out_out'])
   model = STDP_Q_Learning(
     in_size=EXC_SIZE+INH_SIZE,
@@ -356,7 +360,7 @@ if __name__ == '__main__':
     'decay': 0.1,   # Synaptic decay (UNUSED)
     'lr': 0.1,      # Weight update learning rateq
     'trace_length': 15,
-    'env_path': 'env.pkl',
+    'env_path': r'/Users/moshetannenbaum/bindset 4/bindsnet/scripts/Chris/DQN/env.pkl',
     'max_steps': 1000,
     'episodes': 100,
   }

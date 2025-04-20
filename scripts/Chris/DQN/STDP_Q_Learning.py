@@ -1,5 +1,10 @@
 import numpy as np
 import torch
+import os
+
+import sys
+import os
+sys.path.append('/Users/moshetannenbaum/bindset 4/bindsnet')
 
 from bindsnet.network import Network
 from bindsnet.network.monitors import Monitor
@@ -54,6 +59,9 @@ class STDP_Q_Learning(Network):
 
 
     ## Connections ##
+    # in - resivour 
+    # out - motor out 
+    # wfeat - is the weight feature between the input and output
     in_out_wfeat = Weight(name='in_out_weight_feature', value=torch.Tensor(w_exc_out))
     in_out_conn = MulticompartmentConnection(
       source=input, target=output,
@@ -86,6 +94,9 @@ class STDP_Q_Learning(Network):
 
     # Update weights according to reward and eligibility
     dw = self.lr * eligibility * reward
+    #TODO: check the fluctuations in the weights - and if if fluctates to much that just set its value 
+    # trak using something like tensor to see the fluctuations
+    # maybe craete some cisualizaions of the weights (synaptic weight matrix) (synaptis = weight matrix)
     self.weights.value += dw
     self.weights.value = torch.clamp(self.weights.value, self.wmin, self.wmax)
 
